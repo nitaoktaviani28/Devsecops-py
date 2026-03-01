@@ -10,52 +10,76 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. Checkout
+    # ======================
+    # 1. Checkout Source
+    # ======================
     - name: Checkout code
       uses: actions/checkout@v4
 
-    # 2. Extract tag
+    # ======================
+    # 2. Extract Git Tag
+    # ======================
     - name: Extract Git tag
       run: |
         TAG=${GITHUB_REF#refs/tags/}
         echo "APP_TAG=$TAG" >> $GITHUB_ENV
-        echo "Deploying $TAG"
+        echo "Deploying version: $TAG"
 
-    # 3. Login ACR
-    - name: Login to ACR
+    # ======================
+    # 3. Block forbidden tag
+    # ======================
+    - name: Block forbidden tags
+      run: |
+        if [ "$APP_TAG" = "latest" ]; then
+          echo "❌ latest tag is forbidden"
+          exit 1
+        fi
+
+    # ======================
+    # 4. Login to ACR
+    # ======================
+    - name: Login to Azure Container Registry
       run: |
         echo "${{ secrets.ACR_PASSWORD }}" | docker login \
           ${{ secrets.ACR_LOGIN_SERVER }} \
           -u ${{ secrets.ACR_USERNAME }} \
           --password-stdin
 
-    # 4. Build & Push Backend
+    # ======================
+    # 5. Build & Push Backend
+    # ======================
     - name: Build & Push Backend
       run: |
         docker build \
           -t ${{ secrets.ACR_LOGIN_SERVER }}/backend:${APP_TAG} \
           ./backend
+
         docker push \
           ${{ secrets.ACR_LOGIN_SERVER }}/backend:${APP_TAG}
 
-    # 5. Build & Push Frontend
+    # ======================
+    # 6. Build & Push Frontend
+    # ======================
     - name: Build & Push Frontend
       run: |
         docker build \
           -t ${{ secrets.ACR_LOGIN_SERVER }}/frontend:${APP_TAG} \
           ./frontend
+
         docker push \
           ${{ secrets.ACR_LOGIN_SERVER }}/frontend:${APP_TAG}
 
-    # 6. DEPLOY (INI YANG FIX MASALAH KAMU)
-    - name: Deploy to VM
+    # ======================
+    # 7. Deploy to VM (FIXED)
+    # ======================
+    - name: Deploy to Azure VM
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.VM_HOST }}
         username: ${{ secrets.VM_USER }}
         key: ${{ secrets.VM_SSH_KEY }}
         script: |
-          echo "🚀 Deploying version $APP_TAG"
+          echo "🚀 Deploying version ${{ env.APP_TAG }}"
 
           docker login ${{ secrets.ACR_LOGIN_SERVER }} \
             -u ${{ secrets.ACR_USERNAME }} \
@@ -63,7 +87,7 @@ jobs:
 
           cd ~/app
 
-          # INI KUNCI UTAMA
-          APP_TAG=$APP_TAG docker-compose up -d
+          # ⬇️ INI KUNCI SEBENARNYA
+          APP_TAG=${{ env.APP_TAG }} docker-compose up -d
 
           docker ps
