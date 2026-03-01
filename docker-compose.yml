@@ -2,16 +2,15 @@ version: "3.9"
 
 services:
   backend:
-    image: haechanlovelove/backend:latest
+    image: devsecopsacrnita.azurecr.io/backend:${APP_TAG}
     ports:
       - "8000:8000"
     restart: always
 
   frontend:
-    image: haechanlovelove/frontend:latest
+    image: devsecopsacrnita.azurecr.io/frontend:${APP_TAG}
     ports:
       - "80:80"
     depends_on:
       - backend
     restart: always
-    
